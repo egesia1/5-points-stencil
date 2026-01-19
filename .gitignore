@@ -1,0 +1,24 @@
+# Root-level .gitignore for HPCC
+
+# Excluded directory - contains all non-deliverable files
+excluded/
+
+# IDE and editor files
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Local configuration files
+*.local
+
+# Data files - keep CSV results, ignore others
+*.csv
+!data/*.csv
+
+# Executables
+*.exe
+
+# Hypercommented source files (educational/documentation only)
+**/hypercommented/
