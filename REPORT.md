@@ -375,13 +375,34 @@ Strong scaling tests were performed by fixing the problem size (16384×16384) an
 | | **8** | 896 | 64 | 2.81 | 8.13× | 101.6% |
 | | **16** | 1792 | 128 | 1.39 | 16.50× | **103.1%** |
 
-![Strong Scaling Speedup](figures/strong_speedup.png)
+![Strong Scaling Speedup and Efficiency](figures/strong_speedup_efficiency.png)
 
-**Figure 3: Strong Scaling Speedup Comparison**
+**Figure 3: Strong Scaling Speedup and Parallel Efficiency Comparison**
 
-![Strong Scaling Efficiency](figures/strong_efficiency.png)
+**Technical Analysis of Speedup and Efficiency Results:**
 
-**Figure 4: Strong Scaling Parallel Efficiency**
+The combined speedup and efficiency plots reveal several important characteristics of our hybrid parallel implementation:
+
+1. **Super-linear Scaling (Efficiency >100%)**: Both the **16×7** and **2×56** configurations exhibit super-linear speedup, achieving efficiency above 100% (109.1% and 103.2% respectively at 16 nodes). This phenomenon can be attributed to:
+   - **Improved cache locality**: As the problem size per node decreases with more nodes, a larger portion of the grid fits in cache, reducing memory bandwidth pressure
+   - **Reduced memory contention**: Distributing work across more MPI ranks (16×7) or nodes (2×56) reduces memory bandwidth saturation per node
+   - **Better NUMA affinity**: With smaller per-node workloads, data is more likely to reside on local NUMA nodes, minimizing cross-socket memory access penalties
+
+2. **16×7 Configuration Performance**: This configuration achieves the best absolute speedup (17.46×) and shows near-perfect linear scaling up to 8 nodes. The slight super-linearity beyond 8 nodes indicates that the many-MPI approach successfully saturates memory bandwidth at each node while minimizing overhead from too many threads per MPI rank. The 256 MPI tasks at 16 nodes maximize parallelism granularity, allowing for better load balancing. The efficiency plot shows this configuration maintains efficiency above 100% at all node counts, peaking at 109.1% at 16 nodes.
+
+3. **2×56 Configuration Behavior**: Despite fewer MPI tasks (only 32 at 16 nodes) reducing communication overhead, this configuration achieves similar speedup efficiency (103.2%) but with significantly slower absolute runtime (6.10s vs 0.72s). This demonstrates the **memory-bound nature** of the stencil computation: having 56 threads per MPI task creates excessive contention for memory bandwidth, as all threads compete for the same memory subsystem. The higher speedup efficiency is misleading because it starts from a much slower baseline (100.77s vs 12.64s). The efficiency plot shows excellent efficiency (>100%) up to 4 nodes, then a slight decrease to 103.2% at 16 nodes.
+
+4. **8×14 Configuration Trade-off**: This balanced configuration achieves 16.50× speedup with 103.1% efficiency, representing the optimal compromise between:
+   - **MPI communication overhead**: More MPI tasks (128 at 16 nodes) increase communication volume, but this is offset by the smaller per-task halo exchange sizes
+   - **Memory bandwidth utilization**: With 14 threads per task, we avoid the severe contention of 2×56 while still maintaining good parallelization within each MPI rank
+   - **Scalability**: The configuration maintains excellent efficiency across all node counts, indicating robust scaling behavior. The efficiency plot shows a slight dip to 95.8% at 4 nodes, but recovers to 103.1% at 16 nodes.
+
+5. **Deviation from Ideal Scaling**: All configurations show slight deviations from ideal linear scaling as the number of nodes increases. This is expected due to:
+   - **Fixed problem size**: Communication overhead becomes proportionally larger as the computational work per node decreases
+   - **Network latency**: Inter-node communication introduces latency that cannot be fully hidden by computation overlap
+   - **Load imbalance**: Imperfect domain decomposition may create slight load imbalances, especially for non-square grid decompositions
+
+The visualization clearly demonstrates that **the 16×7 configuration provides the best time-to-solution** despite having more communication overhead, while **the 8×14 configuration offers the best balance** between performance and communication efficiency for production workloads.
 
 **Key Results:**
 -   **8×14 Configuration**: Achieved 16.50× speedup with 103.1% efficiency at 16 nodes. This balanced approach provides excellent scalability while maintaining manageable communication overhead.
@@ -391,10 +412,30 @@ Strong scaling tests were performed by fixing the problem size (16384×16384) an
 
 ![Configuration Comparison](figures/config_comparison.png)
 
-**Figure 5: Configuration Comparison (Strong Scaling)**
+**Figure 4: Configuration Comparison (Strong Scaling)**
+
+![Strong Scaling Execution Time](figures/strong_execution_time.png)
+
+**Figure 5: Strong Scaling Execution Time Breakdown**
+
+**Technical Analysis of Execution Time:**
+
+The execution time breakdown plot reveals several critical insights into our strong scaling performance:
+
+1. **Execution Time Drops as More Nodes are Used**: All three configurations demonstrate **strong scaling** behavior, where the total execution time decreases significantly as the number of nodes increases. This is the fundamental characteristic of strong scaling: with a fixed problem size (16384×16384), adding more computational resources reduces the time-to-solution.
+
+2. **Communication Overhead is Minimal**: The communication time represents a small fraction of the total execution time across all configurations and node counts. This demonstrates that our **computation-communication overlap strategy** successfully hides most of the MPI communication latency behind useful computation, keeping communication overhead well below 10% of total time in most cases.
+
+3. **16×7 Configuration Performance**: This configuration achieves the fastest total execution time, dropping from 12.64s (1 node) to 0.72s (16 nodes). The communication time remains consistently low (0.08s at 16 nodes), confirming that even with 256 MPI tasks, the communication overhead is well-managed.
+
+4. **8×14 Configuration Balance**: Shows excellent strong scaling, with total time decreasing from 22.86s (1 node) to 1.39s (16 nodes). Communication time decreases as nodes increase, from 0.90s (1 node) to 0.09s (16 nodes), indicating that the per-node communication volume decreases with more nodes.
+
+5. **2×56 Configuration Behavior**: Despite having the fewest MPI tasks (only 32 at 16 nodes), this configuration shows the slowest total execution time due to memory bandwidth contention. Communication time is relatively low but doesn't compensate for the computational bottleneck created by too many threads per MPI task.
+
+6. **Key Insight**: The small gap between "Total Time" and "Communication Time" lines visually demonstrates that **computation dominates the execution time**, and our overlap strategy successfully hides communication overhead. The execution time reduction follows near-linear scaling, confirming excellent strong scaling performance across all configurations.
 
 ## 4.4 Weak Scalability Study (Multi-node)
-Weak scaling tests involved increasing the problem size proportionally to the number of nodes, keeping the workload per core constant. All three hybrid configurations were tested to evaluate their weak scaling behavior. Tests were performed with 1, 2, and 8 energy sources; the results in Table 3 and Figure 6 use 1 energy source, as performance is independent of the number of energy sources.
+Weak scaling tests involved increasing the problem size proportionally to the number of nodes, keeping the workload per core constant. All three hybrid configurations were tested to evaluate their weak scaling behavior. Tests were performed with 1, 2, and 8 energy sources; the results in Table 3 and Figure 7 use 1 energy source, as performance is independent of the number of energy sources.
 
 **Table 3: Weak Scaling Performance Comparison**
 
@@ -418,7 +459,7 @@ Weak scaling tests involved increasing the problem size proportionally to the nu
 
 ![Weak Scaling Efficiency](figures/weak_efficiency.png)
 
-**Figure 6: Weak Scaling Efficiency Comparison**
+**Figure 7: Weak Scaling Efficiency Comparison**
 
 **Key Observations:**
 -   **Note**: The grid size remained constant (16384×16384) across all node counts, making this effectively a strong scaling test rather than true weak scaling. The efficiency values above 100% reflect the strong scaling behavior (runtime decreases with more nodes).
@@ -442,7 +483,7 @@ To evaluate the impact of compiler optimizations, we performed comparative tests
 
 ![Build Variant Comparison](figures/build_variant_comparison.png)
 
-**Figure 7: Compiler Optimization Impact Comparison**
+**Figure 8: Compiler Optimization Impact Comparison**
 
 **Key Observations:**
 -   **Optimization Impact**: Enabling compiler optimizations (`-O1` or higher) provides approximately **2.8-3.0× speedup** compared to unoptimized code (`-O0`), demonstrating the critical importance of compiler optimizations for performance.
