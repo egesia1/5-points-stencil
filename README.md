@@ -31,7 +31,7 @@ The primary challenge in parallelizing this algorithm lies in managing the depen
 ### Key Achievements
 
 - ✅ **Scalability**: Achieved **17.46× speedup** with **109.1% parallel efficiency** at 16 nodes (1792 cores)
-- ✅ **Performance**: Reduced time-to-solution from ~900s (serial) to **0.72s** (16 nodes) for a 16384×16384 grid
+- ✅ **Performance**: Achieved **0.72s** time-to-solution (16×7 config) and **1.39s** (8×14 config) at 16 nodes for a 16384×16384 grid
 - ✅ **Comprehensive Testing**: Conducted **399 experimental runs** across multiple configurations and optimization levels
 - ✅ **Optimization**: Implemented NUMA-aware memory allocation, communication-computation overlap, and strategic OpenMP deployment
 

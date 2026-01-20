@@ -39,11 +39,10 @@
     - [3.4 Summary of Optimizations](#34-summary-of-optimizations)
 - [4. EXPERIMENTAL RESULTS \& ANALYSIS](#4-experimental-results--analysis)
   - [4.1 Experimental Setup](#41-experimental-setup)
-  - [4.2 Serial Performance Baseline](#42-serial-performance-baseline)
-  - [4.3 OpenMP Scaling Analysis (Intra-node)](#43-openmp-scaling-analysis-intra-node)
-  - [4.4 Strong Scalability Study (Multi-node)](#44-strong-scalability-study-multi-node)
-  - [4.5 Weak Scalability Study (Multi-node)](#45-weak-scalability-study-multi-node)
-  - [4.6 Compiler Optimization Impact Analysis](#46-compiler-optimization-impact-analysis)
+  - [4.2 OpenMP Scaling Analysis (Intra-node)](#42-openmp-scaling-analysis-intra-node)
+  - [4.3 Strong Scalability Study (Multi-node)](#43-strong-scalability-study-multi-node)
+  - [4.4 Weak Scalability Study (Multi-node)](#44-weak-scalability-study-multi-node)
+  - [4.5 Compiler Optimization Impact Analysis](#45-compiler-optimization-impact-analysis)
   - [4.7 Performance Profiling and Bottlenecks](#47-performance-profiling-and-bottlenecks)
 - [5. DISCUSSION \& CONCLUSION](#5-discussion--conclusion)
   - [5.1 Main Achievements](#51-main-achievements)
@@ -313,7 +312,11 @@ The performance analysis was conducted using a comprehensive suite of 399 experi
 -   **Grid Size**: Fixed at 16384×16384 for scaling tests.
 -   **Iterations**: 500-1000 steps to ensure stable measurements.
 -   **Resources**: Scaling from 1 to 16 compute nodes (up to 1792 cores).
--   **Energy Sources**: Tests were performed with 1, 2, and 8 heat sources to evaluate the impact of energy injection patterns on performance. Analysis revealed that the number of energy sources has minimal impact on execution time (variations <5%), as the energy injection operation represents a negligible fraction of the total computational workload. The results presented in this report are based on tests with 1 energy source, which is representative of all tested configurations.
+-   **Energy Sources** (`-e`): Tests were performed with 1, 2, and 8 heat sources to evaluate the impact of energy injection patterns on performance. Analysis revealed that the number of energy sources has minimal impact on execution time (variations <5%), as the energy injection operation represents a negligible fraction of the total computational workload. The results presented in this report are based on tests with 1 energy source, which is representative of all tested configurations.
+-   **Energy per source** (`-E`): 1.0 (default value)
+-   **Injection frequency** (`-f`): 1 (energy injected every iteration, equivalent to `-f 0` in some implementations where 0 means every iteration)
+-   **Periodic boundaries** (`-p`): 0 (non-periodic, fixed boundary conditions)
+-   **Output energy at steps** (`-o`): 0 (disabled for performance tests to minimize I/O overhead)
 -   **Hybrid Configurations**: Three distinct MPI/OpenMP configurations were systematically tested:
     -   **8×14 (standard)**: 8 MPI tasks per node, 14 OpenMP threads per task — balanced hybrid approach
     -   **2×56 (few_tasks)**: 2 MPI tasks per node, 56 OpenMP threads per task — "fat-node" approach
@@ -326,10 +329,7 @@ The performance analysis was conducted using a comprehensive suite of 399 experi
     -   These settings are critical for performance on Leonardo's dual-socket architecture.
 -   **SLURM Configuration**: Exclusive node allocation (`--exclusive`) on the `dcgp_usr_prod` partition, ensuring no resource sharing and consistent performance measurements.
 
-## 4.2 Serial Performance Baseline
-Before parallel scaling, the serial implementation (optimized with OpenMP) was validated. The baseline execution on a single core for a 16384×16384 grid (1000 iterations) took approximately **900 seconds**. The computational complexity was confirmed to scale quadratically $O(N^2)$ with the grid dimension, validating the algorithmic correctness.
-
-## 4.3 OpenMP Scaling Analysis (Intra-node)
+## 4.2 OpenMP Scaling Analysis (Intra-node)
 We first analyzed the scaling behavior within a single node to determine the optimal thread count per MPI task. Tests were conducted with 1, 2, and 8 energy sources; the results in Figures 5-6 are aggregated across all energy source counts, as the number of sources has minimal impact on performance.
 
 ![OpenMP Scaling Speedup](figures/omp_speedup.png)
@@ -348,7 +348,7 @@ We first analyzed the scaling behavior within a single node to determine the opt
     -   **16×7 (many_tasks)**: Maximum MPI parallelism to test the "many-MPI" strategy
     The 8×14 configuration balances the need to saturate memory bandwidth (via multiple MPI ranks) with the benefits of shared-memory parallelism (reducing halo communication volume).
 
-## 4.4 Strong Scalability Study (Multi-node)
+## 4.3 Strong Scalability Study (Multi-node)
 Strong scaling tests were performed by fixing the problem size (16384×16384) and increasing the number of nodes from 1 to 16. We tested **three different hybrid configurations** to identify the optimal balance between MPI tasks and OpenMP threads. All tests were conducted with 1, 2, and 8 energy sources; the results presented in Table 2 and Figures 3-5 are based on tests with 1 energy source, as the number of energy sources has negligible impact on performance (<5% variation).
 
 1.  **16×7 (many_tasks)**: 16 MPI tasks per node, 7 OpenMP threads per task — "many-MPI" approach with minimal OpenMP
@@ -393,7 +393,7 @@ Strong scaling tests were performed by fixing the problem size (16384×16384) an
 
 **Figure 5: Configuration Comparison (Strong Scaling)**
 
-## 4.5 Weak Scalability Study (Multi-node)
+## 4.4 Weak Scalability Study (Multi-node)
 Weak scaling tests involved increasing the problem size proportionally to the number of nodes, keeping the workload per core constant. All three hybrid configurations were tested to evaluate their weak scaling behavior. Tests were performed with 1, 2, and 8 energy sources; the results in Table 3 and Figure 6 use 1 energy source, as performance is independent of the number of energy sources.
 
 **Table 3: Weak Scaling Performance Comparison**
@@ -427,7 +427,7 @@ Weak scaling tests involved increasing the problem size proportionally to the nu
 -   **8×14 Configuration**: Achieved the best weak scaling efficiency (1921.5% at 16 nodes), demonstrating excellent scalability. The balanced hybrid approach maintains consistent performance characteristics across scales.
 -   **Overall**: All three configurations demonstrate excellent scalability, with the 8×14 configuration showing the best efficiency metrics, while the 16×7 configuration provides the fastest time-to-solution.
 
-## 4.6 Compiler Optimization Impact Analysis
+## 4.5 Compiler Optimization Impact Analysis
 To evaluate the impact of compiler optimizations, we performed comparative tests with different optimization levels. All tests used the 8×14 configuration (1 and 4 nodes) with a single energy source.
 
 **Table 4: Compiler Optimization Level Comparison (8×14 Configuration)**
