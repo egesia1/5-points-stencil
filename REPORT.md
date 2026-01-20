@@ -33,7 +33,7 @@
     - [3.2.3 Communication-Computation Overlap](#323-communication-computation-overlap)
   - [3.3 Optimization Techniques](#33-optimization-techniques)
     - [3.3.1 NUMA-Aware First-Touch Allocation](#331-numa-aware-first-touch-allocation)
-    - [3.3.2 Parallel Buffer Packing/Unpacking](#332-parallel-buffer-packingunpacking)
+    - [3.3.2 Optimized Halo Exchange Implementation](#332-optimized-halo-exchange-implementation)
     - [3.3.3 Strategic OpenMP Deployment](#333-strategic-openmp-deployment)
     - [3.3.4 OpenMP Thread Binding and NUMA Awareness](#334-openmp-thread-binding-and-numa-awareness)
     - [3.4 Summary of Optimizations](#34-summary-of-optimizations)
@@ -185,10 +185,29 @@ graph TB
 The domain decomposition implements a 2D Cartesian topology manually, without using MPI's built-in topology functions. The grid dimensions are computed using a factorization algorithm (`simple_factorization()`) that attempts to create sub-domains that are as square as possible to minimize the surface-to-volume ratio, thereby reducing the amount of data exchanged relative to the computation performed. Each process calculates its coordinates (X, Y) in the virtual grid using arithmetic operations (`X = Rank % Grid[_x_]`, `Y = Rank / Grid[_x_]`), and determines its neighbors (North, South, East, West) through direct rank calculations. This manual approach provides explicit control over the decomposition logic and avoids the overhead of MPI topology management functions.
 
 ### 3.2.3 Communication-Computation Overlap
-To hide the latency of MPI communications, we implemented a non-blocking communication strategy overlapped with computation. The stencil update is split into two distinct kernels:
+To hide the latency of MPI communications, we implemented a non-blocking communication strategy overlapped with computation. The halo exchange is implemented inline within the main iteration loop (rather than using separate functions) to minimize function call overhead and enable fine-grained control over the communication pattern. The stencil update is split into two distinct kernels:
 
-1.  **`update_interior()`**: Updates the inner core of the sub-grid, which does not depend on halo data.
-2.  **`update_borders()`**: Updates the edges of the sub-grid, which depend on neighbor data.
+1.  **`update_interior()`**: Updates the inner core of the sub-grid, which does not depend on halo data. This function is parallelized using OpenMP (`#pragma omp parallel for schedule(static)`) to distribute the computation across threads within each MPI process.
+2.  **`update_borders()`**: Updates the edges of the sub-grid, which depend on neighbor data. This function is also parallelized with OpenMP, using separate loops for horizontal and vertical borders to maximize cache efficiency.
+
+The halo exchange follows a precise sequence optimized for performance:
+
+**Phase 1 - Halo Exchange Start (inline implementation):**
+- **East/West borders**: Pack non-contiguous column data into contiguous send buffers using OpenMP parallelization (3-4× speedup).
+- **North/South borders**: Set up direct pointers to contiguous row data (no packing needed).
+- Post non-blocking receives (`MPI_Irecv`) for all neighbors, followed by non-blocking sends (`MPI_Isend`).
+- **Self-communication optimization**: If a neighbor is the same MPI rank (periodic boundaries), copy data directly using OpenMP parallel loops instead of MPI calls, eliminating network overhead and reducing latency.
+
+**Phase 2 - Computation Overlap:**
+- Immediately call `update_interior()` to compute interior points while MPI transfers halo data in the background. This function uses OpenMP to parallelize the computation across threads within the MPI process.
+
+**Phase 3 - Halo Exchange Finish:**
+- Call `MPI_Waitall()` to ensure all communications are complete.
+- **East/West**: Unpack received data from buffers into halo regions using OpenMP parallelization.
+- **North/South**: Data is already in place via direct pointers (no unpacking needed).
+
+**Phase 4 - Border Computation:**
+- Call `update_borders()` to compute border points using the fresh halo data. This function also uses OpenMP parallelization, with separate loops for horizontal and vertical borders to optimize cache access patterns.
 
 The execution flow is visualized in the following flowchart:
 
@@ -236,16 +255,39 @@ gantt
 ### 3.3.1 NUMA-Aware First-Touch Allocation
 On the Leonardo dual-socket nodes, memory placement is critical. Linux places a memory page on the NUMA node of the CPU core that first accesses ("touches") it. We implemented a parallel initialization routine using OpenMP where each thread initializes the portion of the grid it will later compute. This ensures that memory pages are allocated on the local NUMA node for each thread, reducing cross-socket traffic and improving effective bandwidth by approximately 2.5×.
 
-### 3.3.2 Parallel Buffer Packing/Unpacking
-The halo exchange handles East/West and North/South borders differently due to memory layout. **East/West borders** (vertical columns) are non-contiguous in memory and must be packed into contiguous buffers before sending. We parallelized these packing and unpacking loops using OpenMP, providing a 3-4× speedup in the communication preparation phase. **North/South borders** (horizontal rows) are contiguous in memory, so they use direct pointers without separate buffers, eliminating the need for packing/unpacking operations. Additionally, we implemented a self-communication optimization: when a neighbor is the same MPI rank (e.g., in periodic boundary conditions), data is copied directly instead of using MPI calls, further reducing overhead.
+### 3.3.2 Optimized Halo Exchange Implementation
+The halo exchange is carefully optimized to minimize overhead and maximize performance:
+
+**Memory Layout Optimization:**
+- **East/West borders** (vertical columns) are non-contiguous in memory and must be packed into contiguous buffers before sending. We parallelized these packing and unpacking loops using OpenMP, providing a 3-4× speedup in the communication preparation phase.
+- **North/South borders** (horizontal rows) are contiguous in memory, so they use direct pointers without separate buffers, eliminating the need for packing/unpacking operations entirely.
+
+**Self-Communication Optimization:**
+- When a neighbor is the same MPI rank (e.g., in periodic boundary conditions with wrap-around), data is copied directly using OpenMP parallel loops instead of MPI calls, eliminating network overhead and reducing latency.
+
+**Inline Implementation:**
+- The halo exchange is implemented inline within the main iteration loop rather than using separate functions (`halo_exchange_start`/`halo_exchange_finish`). This approach minimizes function call overhead and provides fine-grained control over the communication pattern, enabling better compiler optimization and reducing instruction cache misses.
 
 ### 3.3.3 Strategic OpenMP Deployment
-A total of 18 OpenMP pragmas were strategically placed throughout the code. Beyond the main stencil loops, we parallelized:
--   Halo copy operations.
--   Global energy reduction (using `reduction(+:variable)`).
--   Buffer initialization and clearing.
--   Statistics calculation (min/max/avg).
-    Using `schedule(static)` proved most effective due to the uniform workload of the stencil operation, minimizing scheduling overhead compared to dynamic or guided policies.
+A total of 18 OpenMP pragmas were strategically placed throughout the code to maximize parallelization opportunities. The OpenMP parallelization covers:
+
+**Stencil Computation (core loops):**
+- **`update_interior()`**: Parallelizes the computation of interior grid points (1 pragma).
+- **`update_borders()`**: Parallelizes border point computation with separate loops for horizontal and vertical borders (2 pragmas).
+
+**Halo Exchange Operations:**
+- **Packing East/West buffers**: Parallel packing of non-contiguous column data into send buffers (2 pragmas).
+- **Self-communication copies**: When a neighbor is the same MPI rank, parallel copy operations replace MPI calls (4 pragmas for East/West/North/South).
+- **Unpacking East/West buffers**: Parallel unpacking of received data into halo regions (2 pragmas).
+
+**Memory Management:**
+- **First-touch NUMA allocation**: Parallel initialization of grid memory to ensure NUMA-aware placement (2 pragmas for OLD and NEW planes).
+
+**Reduction Operations:**
+- **Global energy calculation**: Parallel sum using `reduction(+:variable)` in `get_total_energy()` (1 pragma).
+- **Statistics calculation**: Min/max calculations in dump operations using `reduction(min:...)` and `reduction(max:...)` (1 pragma).
+
+Using `schedule(static)` proved most effective due to the uniform workload of the stencil operation, minimizing scheduling overhead compared to dynamic or guided policies. This comprehensive OpenMP deployment ensures that all computationally intensive operations within each MPI process are parallelized, maximizing CPU utilization and memory bandwidth saturation.
 
 ### 3.3.4 OpenMP Thread Binding and NUMA Awareness
 We configured OpenMP to bind threads to physical cores using `OMP_PLACES=cores` and `OMP_PROC_BIND=close`. This ensures that threads are placed on cores within the same NUMA node, minimizing remote memory access latency. This configuration is critical on Leonardo's dual-socket architecture, where cross-socket memory access can incur significant performance penalties (up to 2× latency increase). The `close` binding policy creates a compact thread placement that respects NUMA boundaries, ensuring that each MPI rank's OpenMP threads access memory from the local socket, maximizing effective memory bandwidth.
@@ -261,7 +303,7 @@ Table 1 summarizes the key optimization strategies implemented and their impact 
 | **Hybrid Parallelism** | Scaling beyond single node limits | MPI for inter-node, OpenMP for intra-node | Enables scaling to 1000+ cores |
 | **Communication Overlap** | High MPI latency waiting for data | Non-blocking `MPI_Isend`/`Irecv` + Interior/Border split | Communication overhead < 10% |
 | **First-Touch Allocation** | Remote memory access latency (NUMA) | Parallel OpenMP initialization of grid data | ~2.5× bandwidth improvement |
-| **Parallel Buffer Packing** | Serial bottleneck in halo preparation | OpenMP parallel loops for packing/unpacking | 3-4× speedup in packing phase |
+| **Optimized Halo Exchange** | Serial bottleneck in halo preparation | Inline implementation with OpenMP parallel packing (East/West), direct pointers (North/South), self-communication optimization | 3-4× speedup in packing phase, eliminated unpacking for North/South |
 | **Static Scheduling** | OpenMP runtime overhead | `schedule(static)` for uniform loops | Reduced synchronization cost |
 
 # 4. EXPERIMENTAL RESULTS & ANALYSIS
