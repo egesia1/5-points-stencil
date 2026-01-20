@@ -182,7 +182,7 @@ graph TB
 ```
 
 ### 3.2.2 Domain Decomposition
-The domain decomposition is handled using MPI Cartesian topology functions (`MPI_Cart_create`). This approach automatically maps processes to a 2D virtual grid, optimizing neighborhood relationships and simplifying rank-to-coordinate mapping. The decomposition strategy attempts to create sub-domains that are as square as possible to minimize the surface-to-volume ratio, thereby reducing the amount of data exchanged relative to the computation performed.
+The domain decomposition implements a 2D Cartesian topology manually, without using MPI's built-in topology functions. The grid dimensions are computed using a factorization algorithm (`simple_factorization()`) that attempts to create sub-domains that are as square as possible to minimize the surface-to-volume ratio, thereby reducing the amount of data exchanged relative to the computation performed. Each process calculates its coordinates (X, Y) in the virtual grid using arithmetic operations (`X = Rank % Grid[_x_]`, `Y = Rank / Grid[_x_]`), and determines its neighbors (North, South, East, West) through direct rank calculations. This manual approach provides explicit control over the decomposition logic and avoids the overhead of MPI topology management functions.
 
 ### 3.2.3 Communication-Computation Overlap
 To hide the latency of MPI communications, we implemented a non-blocking communication strategy overlapped with computation. The stencil update is split into two distinct kernels:
