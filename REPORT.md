@@ -433,38 +433,55 @@ The execution time breakdown plot reveals several critical insights into our str
 6. **Key Insight**: The small gap between "Total Time" and "Communication Time" lines visually demonstrates that **computation dominates the execution time**, and our overlap strategy successfully hides communication overhead. The execution time reduction follows near-linear scaling, confirming excellent strong scaling performance across all configurations.
 
 ## 4.4 Weak Scalability Study (Multi-node)
-Weak scaling tests involved increasing the problem size proportionally to the number of nodes, keeping the workload per core constant. All three hybrid configurations were tested to evaluate their weak scaling behavior. Tests were performed with 1, 2, and 8 energy sources; the results in Table 3 and Figure 7 use 1 energy source, as performance is independent of the number of energy sources.
+Weak scaling tests involved increasing the problem size proportionally to the number of nodes, keeping the workload per core constant. The 16×7 hybrid configuration was tested to evaluate weak scaling behavior. Tests were performed with 1 energy source. The grid size scales proportionally with the number of nodes to maintain constant work per core.
 
-**Table 3: Weak Scaling Performance Comparison**
+**Table 3: Weak Scaling Performance (16×7 Configuration)**
 
-| Configuration | Nodes | Grid Size | Total Points | Runtime (s) | Efficiency |
-| :---: | :---: | :---: | :---: | :---: | :---: |
-| **16×7** | **1** | 16384 × 16384 | 2.68 $\cdot 10^8$ | 12.56 | 100.0% |
-| | **2** | 16384 × 16384 | 2.68 $\cdot 10^8$ | 7.01 | 179.2% |
-| | **4** | 16384 × 16384 | 2.68 $\cdot 10^8$ | 3.35 | 375.2% |
-| | **8** | 16384 × 16384 | 2.68 $\cdot 10^8$ | 1.54 | 817.4% |
-| | **16** | 16384 × 16384 | 2.68 $\cdot 10^8$ | 0.73 | **1720.5%** |
-| **2×56** | **1** | 16384 × 16384 | 2.68 $\cdot 10^8$ | 101.36 | 100.0% |
-| | **2** | 16384 × 16384 | 2.68 $\cdot 10^8$ | 45.59 | 222.3% |
-| | **4** | 16384 × 16384 | 2.68 $\cdot 10^8$ | 23.78 | 426.2% |
-| | **8** | 16384 × 16384 | 2.68 $\cdot 10^8$ | 12.39 | 818.3% |
-| | **16** | 16384 × 16384 | 2.68 $\cdot 10^8$ | 6.02 | **1683.6%** |
-| **8×14** | **1** | 16384 × 16384 | 2.68 $\cdot 10^8$ | 26.42 | 100.0% |
-| | **2** | 16384 × 16384 | 2.68 $\cdot 10^8$ | 11.90 | 222.0% |
-| | **4** | 16384 × 16384 | 2.68 $\cdot 10^8$ | 5.82 | 453.8% |
-| | **8** | 16384 × 16384 | 2.68 $\cdot 10^8$ | 2.80 | 944.2% |
-| | **16** | 16384 × 16384 | 2.68 $\cdot 10^8$ | 1.38 | **1921.5%** |
+| Nodes | Grid Size | Total Points | Runtime Non-Periodic (s) | Efficiency Non-Periodic | Runtime Periodic (s) | Efficiency Periodic |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **1** | 16384 × 16384 | 2.68 $\cdot 10^8$ | 12.66 | 100.0% | 12.68 | 100.0% |
+| **2** | 23170 × 23170 | 5.37 $\cdot 10^8$ | 12.94 | 97.9% | 13.46 | 94.2% |
+| **4** | 32768 × 32768 | 1.07 $\cdot 10^9$ | 12.82 | 98.8% | 12.99 | 97.6% |
+| **8** | 46340 × 46340 | 2.15 $\cdot 10^9$ | 13.08 | 96.8% | 13.19 | 96.1% |
+| **16** | 65536 × 65536 | 4.29 $\cdot 10^9$ | 12.68 | **99.9%** | 13.13 | **96.6%** |
 
 ![Weak Scaling Efficiency](figures/weak_efficiency.png)
 
-**Figure 7: Weak Scaling Efficiency Comparison**
+**Figure 7: Weak Scaling Efficiency (16×7 Configuration)**
+
+![Weak Scaling Execution Time](figures/weak_execution_time.png)
+
+**Figure 8: Weak Scaling Execution Time Breakdown (16×7 Configuration)**
+
+**Technical Analysis of Execution Time Breakdown:**
+
+The execution time breakdown plot reveals several critical insights into weak scaling performance:
+
+1. **Communication Overhead is Minimal**: For non-periodic boundaries, communication time represents only 3.3-6.0% of total execution time (0.42-0.76 seconds). This demonstrates that our **computation-communication overlap strategy** successfully hides most MPI communication latency behind useful computation, keeping communication overhead well below 10% of total time.
+
+2. **Periodic Boundary Impact on Communication**: Periodic boundaries show slightly higher communication overhead (3.5-8.7% of total time, 0.44-1.14 seconds), with a peak at 2 nodes (1.07 seconds, representing 7.9% of total time). This confirms that the wrap-around communication required for periodic boundaries introduces additional overhead, as boundary processes must exchange data with processes on the opposite side of the grid domain.
+
+3. **Non-Periodic Boundaries**: The communication time scales proportionally with the problem size, increasing from 0.42s (1 node) to 0.76s (16 nodes). Despite this 81% increase in communication time, the total execution time remains nearly constant (12.66-13.08 seconds), demonstrating that communication overhead scales proportionally with computation and our overlap strategy effectively hides this overhead.
+
+4. **Periodic Boundaries**: Communication time shows more variation (0.44-1.14 seconds), with the highest value at 2 nodes (1.07s) and 16 nodes (1.14s). The increased communication overhead at 2 nodes (where efficiency drops to 94.2%) suggests that the wrap-around communication pattern creates more complex network routing, particularly at smaller scales where boundary processes represent a larger fraction of total processes.
+
+5. **Key Insight**: The small gap between "Total Time" and "Communication Time" lines visually demonstrates that **computation dominates the execution time** for both boundary conditions. The consistent total execution time across scales, despite increasing communication overhead, confirms that our overlap strategy successfully maintains excellent weak scaling performance even with the additional communication complexity introduced by periodic boundaries.
 
 **Key Observations:**
--   **Note**: The grid size remained constant (16384×16384) across all node counts, making this effectively a strong scaling test rather than true weak scaling. The efficiency values above 100% reflect the strong scaling behavior (runtime decreases with more nodes).
--   **16×7 Configuration**: Achieved the fastest absolute runtime (0.73s at 16 nodes) with 1720.5% efficiency. The many-MPI approach continues to excel in absolute performance while maintaining strong scaling characteristics.
--   **2×56 Configuration**: Showed good scaling efficiency (1683.6% at 16 nodes), though the absolute runtime remains higher due to memory bandwidth limitations with many threads per MPI task.
--   **8×14 Configuration**: Achieved the best weak scaling efficiency (1921.5% at 16 nodes), demonstrating excellent scalability. The balanced hybrid approach maintains consistent performance characteristics across scales.
--   **Overall**: All three configurations demonstrate excellent scalability, with the 8×14 configuration showing the best efficiency metrics, while the 16×7 configuration provides the fastest time-to-solution.
+-   **True Weak Scaling**: The grid size scales proportionally with the number of nodes (from 16384×16384 to 65536×65536), maintaining constant work per core. This represents a proper weak scaling study.
+
+-   **Boundary Conditions Explained**: The weak scaling tests evaluated both **non-periodic** (fixed) and **periodic** (wrap-around) boundary conditions to assess their impact on scalability:
+    -   **Non-Periodic Boundaries**: With fixed boundaries, the grid edges maintain constant values (e.g., temperature fixed at boundary). This means MPI processes at the global grid boundary only exchange halo data with their interior neighbors, not requiring any wrap-around communication. The halo exchange pattern is straightforward: each process communicates only with its direct neighbors (North, South, East, West).
+    -   **Periodic Boundaries**: With periodic boundaries, the grid "wraps around" at the edges (e.g., the top edge connects to the bottom edge, left connects to right). This creates a toroidal topology where boundary processes must exchange halo data not only with interior neighbors but also with processes on the opposite side of the grid. For example, a process at the left edge of the grid needs data from the process at the right edge of the same row, requiring additional communication paths and potentially more complex routing.
+
+-   **Non-Periodic Boundaries**: Excellent weak scaling with runtime remaining nearly constant (12.66-13.08 seconds) and efficiency above 96.8%, peaking at 99.9% at 16 nodes. The simpler communication pattern (no wrap-around) results in minimal performance degradation as the problem scales, with each process communicating only with its immediate neighbors.
+
+-   **Periodic Boundaries**: Good weak scaling with runtime remaining stable (12.68-13.46 seconds) and efficiency above 94.2%, achieving 96.6% at 16 nodes. The wrap-around communication introduces additional overhead as boundary processes must exchange data with processes on the opposite side of the grid domain. This creates longer communication paths and potentially more complex network routing, explaining the slightly higher runtime (particularly visible at 2 nodes where efficiency drops to 94.2%). However, our overlap strategy still effectively hides most of this additional communication cost behind computation.
+
+-   **Boundary Condition Impact**: Periodic boundaries show slightly lower efficiency (94.2-97.6%) compared to non-periodic boundaries (96.8-99.9%), with the difference being most pronounced at 2 nodes (94.2% vs 97.9%). This performance gap is expected and demonstrates that the additional wrap-around communication overhead scales with the number of boundary processes. Despite this, both boundary conditions maintain excellent weak scaling (>94% efficiency), validating that our communication-computation overlap strategy is robust across different communication patterns.
+-   **Grid Scaling Verification**: The grid dimensions scale as expected: 16384 → 23170 → 32768 → 46340 → 65536, approximately following a $\sqrt{N}$ relationship where $N$ is the number of nodes, ensuring constant work per core.
+-   **Communication Overhead**: The consistent runtime across scales indicates that communication overhead scales proportionally with computation, and our overlap strategy successfully hides most communication latency even at larger scales, regardless of boundary conditions.
+-   **Overall**: These results validate the **efficiency and robustness** of the hybrid parallel strategy, demonstrating that the implementation maintains excellent weak scalability up to 16 nodes (1792 cores) while scaling the problem size by a factor of 16×, with both periodic and non-periodic boundary conditions.
 
 ## 4.5 Compiler Optimization Impact Analysis
 To evaluate the impact of compiler optimizations, we performed comparative tests with different optimization levels. All tests used the 8×14 configuration (1 and 4 nodes) with a single energy source.
@@ -481,7 +498,7 @@ To evaluate the impact of compiler optimizations, we performed comparative tests
 
 ![Build Variant Comparison](figures/build_variant_comparison.png)
 
-**Figure 8: Compiler Optimization Impact Comparison**
+**Figure 9: Compiler Optimization Impact Comparison**
 
 **Key Observations:**
 -   **Optimization Impact**: Enabling compiler optimizations (`-O1` or higher) provides approximately **2.8-3.0× speedup** compared to unoptimized code (`-O0`), demonstrating the critical importance of compiler optimizations for performance.
@@ -501,7 +518,7 @@ Detailed instrumentation revealed the breakdown of execution time:
 
 ## 5.1 Main Achievements
 This project successfully delivered a highly scalable parallel implementation of the 5-point stencil algorithm. The hybrid MPI+OpenMP approach, augmented with advanced optimization techniques, met and exceeded the performance objectives. The key achievements include:
--   **Scalability**: Demonstrated excellent strong scaling across all three tested configurations, with the 16×7 configuration achieving 17.46× speedup (109.1% efficiency) and the 8×14 configuration achieving 16.50× speedup (103.1% efficiency) at 16 nodes, validating the code's readiness for large-scale simulations.
+-   **Scalability**: Demonstrated excellent strong and weak scaling across tested configurations. Strong scaling: 16×7 configuration achieved 17.46× speedup (109.1% efficiency) and 8×14 configuration achieved 16.50× speedup (103.1% efficiency) at 16 nodes. Weak scaling: 16×7 configuration maintained 96-98% efficiency with near-constant runtime (12.67-13.20s) while scaling problem size by 16× (from 16384×16384 to 65536×65536), validating the code's readiness for large-scale simulations.
 -   **Optimization Effectiveness**: The combination of NUMA-aware allocation, parallel buffering, and communication overlap proved crucial. Specifically, the "interior/border split" strategy effectively hid communication latency, rendering it a negligible factor (<10% overhead).
 -   **Configuration Analysis**: Through extensive testing (399 runs) of three distinct hybrid configurations (8×14, 2×56, 16×7), we empirically demonstrated that:
     -   The **16×7 configuration** achieves the fastest absolute time-to-solution (0.72s at 16 nodes) due to superior memory bandwidth saturation through many MPI ranks.

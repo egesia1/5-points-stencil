@@ -10,6 +10,7 @@ echo ""
 echo "This will submit ALL parametric tests:"
 echo "- Strong scaling: 3 configs x 3 energy levels x 5 node counts = 45 jobs"
 echo "- Weak scaling:   3 configs x 3 energy levels x 5 node counts = 45 jobs"
+echo "                  (CORRECTED: grid size scales proportionally with nodes)"
 echo "- OMP scaling:    3 energy levels x 9 thread counts = 27 jobs"
 echo "TOTAL: 117 jobs"
 echo ""
@@ -29,14 +30,16 @@ echo "=== Strong Scaling ==="
 bash scripts/parametric_strong_scaling.sh
 echo ""
 
-# Run weak scaling tests
-echo "=== Weak Scaling ==="
+# Run weak scaling tests (CORRECTED version with proportional grid scaling)
+echo "=== Weak Scaling (CORRECTED - proportional grid scaling) ==="
 bash scripts/parametric_weak_scaling.sh
 echo ""
 
-# Run OMP scaling tests
-echo "=== OpenMP Scaling ==="
+# Run OMP scaling tests (with energy sources: 1, 2, 8)
+echo "=== OpenMP Scaling (with energy sources) ==="
 bash scripts/parametric_omp_scaling.sh
+echo ""
+echo "Note: For OMP tests without energy sources, use: scripts/parametric_omp_scaling_no_energy.sh"
 echo ""
 
 echo "=========================================="
