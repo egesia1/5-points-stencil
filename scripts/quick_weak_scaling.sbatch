@@ -17,13 +17,13 @@
 # - 16 MPI tasks per node
 # - 7 OpenMP threads per task
 
-EXEC="../build/parallel"
+EXEC="build/parallel"
 N_STEPS=500
 NODES_LIST="1 2 4 8 16"
 ENERGY_SOURCE=1  # Single energy source
 
 # Output management
-RESULTS_DIR="../results/weak_scalability"
+RESULTS_DIR="results/weak_scalability"
 CONFIG_NAME="16x7"
 BUILD_VARIANT="ofast_omp_improved"
 OUTPUT_FILE="${RESULTS_DIR}/weak_scalability_results_${CONFIG_NAME}_${BUILD_VARIANT}.txt"
