@@ -1,0 +1,26 @@
+Loading openmpi/4.1.6--gcc--12.2.0
+  Loading requirement: gcc/12.2.0-binut2.41
+Job ID: 32600136
+Configuration: 16 tasks/node, 7 threads/task
+Nodes to test: 1 2 4 8 16
+Output file: ../results/weak_scalability/weak_scalability_results_16x7_ofast_omp_improved.txt
+====================================================
+--- RUNNING: 1 nodes, 16 MPI tasks, Grid: 16384×16384 ---
+srun: fatal: Can not execute ../build/parallel
+--- COMPLETED ---
+--- RUNNING: 2 nodes, 32 MPI tasks, Grid: 23170×23170 ---
+srun: fatal: Can not execute ../build/parallel
+--- COMPLETED ---
+--- RUNNING: 4 nodes, 64 MPI tasks, Grid: 32768×32768 ---
+srun: fatal: Can not execute ../build/parallel
+--- COMPLETED ---
+--- RUNNING: 8 nodes, 128 MPI tasks, Grid: 46340×46340 ---
+srun: fatal: Can not execute ../build/parallel
+--- COMPLETED ---
+--- RUNNING: 16 nodes, 256 MPI tasks, Grid: 65536×65536 ---
+srun: fatal: Can not execute ../build/parallel
+--- COMPLETED ---
+====================================================
+All weak scaling tests are complete.
+Results saved to: ../results/weak_scalability/weak_scalability_results_16x7_ofast_omp_improved.txt
+====================================================

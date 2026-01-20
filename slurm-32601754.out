@@ -1,0 +1,41 @@
+Loading openmpi/4.1.6--gcc--12.2.0
+  Loading requirement: gcc/12.2.0-binut2.41
+----------------------------------------------------
+Job ID: 32601754
+Job Name: weak_16x7_1n_p1
+Running on 1 nodes
+Total MPI tasks: 16
+Tasks per node: 16
+CPUs per task (OMP_NUM_THREADS): 7
+Program arguments: -x 16384 -y 16384 -n 500 -e 1 -p 1 -t 1
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+total injected energy is 500, system energy is 500 ( in avg 2.98023e-05 per grid point)
+Total time: 12.664765
+Initialization time: 0.091312
+Computation time: 12.522733
+  - Internal computation: 12.448089 (98.29%)
+  - Border computation: 0.074644 (0.59%)
+Communication time: 0.420967
+Pack time: 0.000000
+Unpack time: 0.000000
+Communication/Total ratio: 3.32%
+Computation/Total ratio: 98.88%
+Other time (overhead): -0.278935 (-2.20%)
+
+Job completed successfully
+----------------------------------------------------

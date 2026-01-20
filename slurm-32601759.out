@@ -1,0 +1,153 @@
+Loading openmpi/4.1.6--gcc--12.2.0
+  Loading requirement: gcc/12.2.0-binut2.41
+----------------------------------------------------
+Job ID: 32601759
+Job Name: weak_16x7_8n_p0
+Running on 8 nodes
+Total MPI tasks: 128
+Tasks per node: 16
+CPUs per task (OMP_NUM_THREADS): 7
+Program arguments: -x 46340 -y 46340 -n 500 -e 1 -p 0 -t 1
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+ -------- help unavailable ----------
+total injected energy is 500, system energy is 500 ( in avg 2.97933e-05 per grid point)
+Total time: 13.079132
+Initialization time: 0.095780
+Computation time: 12.952059
+  - Internal computation: 12.886848 (98.53%)
+  - Border computation: 0.070272 (0.54%)
+Communication time: 0.626631
+Pack time: 0.000000
+Unpack time: 0.000000
+Communication/Total ratio: 4.79%
+Computation/Total ratio: 99.03%
+Other time (overhead): -0.499558 (-3.82%)
+
+Job completed successfully
+----------------------------------------------------
