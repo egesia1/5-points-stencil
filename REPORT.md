@@ -410,8 +410,6 @@ The visualization clearly demonstrates that **the 16×7 configuration provides t
 -   **16×7 Configuration**: Achieved the best absolute performance (0.72s at 16 nodes) with 17.46× speedup and 109.1% efficiency. The many-MPI approach maximizes memory bandwidth utilization by distributing work across more MPI ranks, though it increases communication overhead.
 -   **Overall Comparison**: The 16×7 configuration achieves the fastest time-to-solution due to superior memory bandwidth saturation, while the 8×14 configuration offers the best balance between performance and communication efficiency. The 2×56 configuration demonstrates that maximizing threads per MPI rank is not optimal for this memory-bound kernel.
 
-![Configuration Comparison](figures/config_comparison.png)
-
 **Figure 4: Configuration Comparison (Strong Scaling)**
 
 ![Strong Scaling Execution Time](figures/strong_execution_time.png)

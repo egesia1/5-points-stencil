@@ -67,10 +67,10 @@ def load_and_process_data(csv_path):
     return results
 
 def plot_strong_speedup_efficiency(results, output_path_speedup, output_path_efficiency, output_path_combined):
-    """Generate combined strong scaling speedup and efficiency plots."""
+    """Generate combined strong scaling speedup, efficiency, and config comparison plots."""
     
-    # Create figure with 2 subplots side by side
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    # Create figure with 3 subplots side by side
+    fig, axes = plt.subplots(1, 3, figsize=(21, 6))
     fig.patch.set_facecolor('white')  # Set figure background to white
     
     # Colors and markers for each configuration
@@ -146,6 +146,35 @@ def plot_strong_speedup_efficiency(results, output_path_speedup, output_path_eff
     # Set x-axis ticks
     ax_efficiency.set_xticks([1, 2, 4, 8, 16])
     ax_efficiency.set_xticklabels(['1', '2', '4', '8', '16'])
+    
+    # ========== THIRD SUBPLOT: CONFIGURATION COMPARISON (RUNTIME) ==========
+    ax_comparison = axes[2]
+    ax_comparison.set_facecolor('white')  # Set subplot background to white
+    
+    # Plot runtime for each configuration
+    for config_name in ['16×7', '2×56', '8×14']:
+        if config_name in results:
+            data = results[config_name]
+            ax_comparison.plot(data['nodes'], data['runtime'], 
+                              marker=markers[config_name], 
+                              linewidth=2, 
+                              markersize=8,
+                              color=colors[config_name],
+                              label=f'{config_name}',
+                              zorder=2)
+    
+    # Customize comparison plot
+    ax_comparison.set_xlabel('Number of Nodes', fontsize=12, fontweight='bold')
+    ax_comparison.set_ylabel('Runtime (seconds)', fontsize=12, fontweight='bold')
+    ax_comparison.set_title('Configuration Comparison', fontsize=14, fontweight='bold')
+    ax_comparison.legend(loc='best', fontsize=10, framealpha=0.9)
+    ax_comparison.grid(True, alpha=0.3, linestyle='--')
+    ax_comparison.set_xlim(0.5, 16.5)
+    ax_comparison.set_ylim(bottom=0)
+    
+    # Set x-axis ticks
+    ax_comparison.set_xticks([1, 2, 4, 8, 16])
+    ax_comparison.set_xticklabels(['1', '2', '4', '8', '16'])
     
     # Improve layout
     plt.tight_layout()
