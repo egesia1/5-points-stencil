@@ -20,5 +20,6 @@ excluded/
 # Executables
 *.exe
 
-# Hypercommented source files (educational/documentation only)
+# Hypercommented source files
 **/hypercommented/
+src/hypercommented/
