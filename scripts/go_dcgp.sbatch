@@ -23,12 +23,88 @@
 #           Executable and Modules
 # =======================================================
 
-# Use EXEC if passed from outside, otherwise default to build/parallel
-EXEC=${EXEC:-build/parallel}
-
 # Unload any existing gcc module first to avoid conflicts
 module purge
 module load openmpi/4.1.6--gcc--12.2.0
+
+# =======================================================
+#      Select Executable Based on BUILD_VARIANT
+# =======================================================
+
+# If EXEC is explicitly set from outside, use it
+# Otherwise, select based on BUILD_VARIANT and TEST_TYPE
+if [ -z "$EXEC" ]; then
+    if [ "$TEST_TYPE" = "omp" ]; then
+        # OpenMP-only tests: use serial_omp variants
+        case "$BUILD_VARIANT" in
+            o0)
+                EXEC=build/serial_omp_o0
+                ;;
+            o1)
+                EXEC=build/serial_omp_o1
+                ;;
+            noarch)
+                EXEC=build/serial_omp_noarch
+                ;;
+            ofast|ofast_omp_improved)
+                # ofast and ofast_omp_improved use the same executable
+                # (difference is in the code, not compilation flags)
+                EXEC=build/serial_omp
+                ;;
+            *)
+                # Default to standard build
+                EXEC=build/serial_omp
+                ;;
+        esac
+    else
+        # MPI tests: use parallel variants
+        case "$BUILD_VARIANT" in
+            o0)
+                EXEC=build/parallel_o0
+                ;;
+            o1)
+                EXEC=build/parallel_o1
+                ;;
+            noarch)
+                EXEC=build/parallel_noarch
+                ;;
+            ofast|ofast_omp_improved)
+                # ofast and ofast_omp_improved use the same executable
+                # (difference is in the code, not compilation flags)
+                EXEC=build/parallel
+                ;;
+            *)
+                # Default to standard build
+                EXEC=build/parallel
+                ;;
+        esac
+    fi
+fi
+
+# Verify executable exists
+if [ ! -f "$EXEC" ]; then
+    echo "ERROR: Executable not found: $EXEC"
+    echo "Build variant: ${BUILD_VARIANT:-default}"
+    echo "Test type: ${TEST_TYPE:-unknown}"
+    echo ""
+    echo "Please compile the required variant first:"
+    if [ "$TEST_TYPE" = "omp" ]; then
+        case "$BUILD_VARIANT" in
+            o0) echo "  make serial_omp_o0" ;;
+            o1) echo "  make serial_omp_o1" ;;
+            noarch) echo "  make serial_omp_noarch" ;;
+            *) echo "  make serial_omp" ;;
+        esac
+    else
+        case "$BUILD_VARIANT" in
+            o0) echo "  make parallel_o0" ;;
+            o1) echo "  make parallel_o1" ;;
+            noarch) echo "  make parallel_noarch" ;;
+            *) echo "  make parallel" ;;
+        esac
+    fi
+    exit 1
+fi
 
 # =======================================================
 #               Environment Variables
@@ -49,6 +125,8 @@ echo "Running on ${SLURM_NNODES} nodes"
 echo "Total MPI tasks: ${SLURM_NTASKS}"
 echo "Tasks per node: ${SLURM_NTASKS_PER_NODE}"
 echo "CPUs per task (OMP_NUM_THREADS): ${SLURM_CPUS_PER_TASK}"
+echo "Build variant: ${BUILD_VARIANT:-default}"
+echo "Executable: ${EXEC}"
 echo "Program arguments: ${PROGRAM_ARGS}"
 
 # =======================================================
@@ -56,11 +134,10 @@ echo "Program arguments: ${PROGRAM_ARGS}"
 # =======================================================
 
 if [ "$TEST_TYPE" = "omp" ]; then
-    # Use serial_omp for OpenMP-only tests
-    EXEC=build/serial_omp
+    # OpenMP-only tests
     ${EXEC} ${PROGRAM_ARGS}
 else
-    # Use parallel for MPI tests
+    # MPI tests
     # -x propagates environment variables to all MPI ranks
     mpirun -x TEST_TYPE -x BUILD_VARIANT -np ${SLURM_NTASKS} ${EXEC} ${PROGRAM_ARGS}
 fi

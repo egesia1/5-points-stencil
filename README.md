@@ -232,12 +232,13 @@ The **16×7 configuration** achieved the best absolute performance due to superi
 - Runtime remained extremely stable (11.45s to 11.65s) as problem size scaled proportionally
 - Confirms the implementation efficiently handles growing problem sizes
 
-### 4. Compiler Optimization Impact
+### 4. OpenMP Code Optimization Impact
 
-Comparative tests with different optimization levels showed:
-- **2.8-3.0× speedup** from compiler optimizations compared to unoptimized code (`-O0`)
-- The `-march=native` flag provides minimal additional benefit, indicating generic `-Ofast` optimizations are already highly effective
-- Link Time Optimization (LTO) enables cross-module optimizations
+Comparative tests between code variants with identical compiler flags (`-Ofast -flto -fopenmp -march=native`) showed:
+- **Critical importance of explicit OpenMP pragmas**: Code without pragmas (`ofast`) runs sequentially on a single thread regardless of `OMP_NUM_THREADS`
+- **20× speedup** at 112 threads when adding 18 strategic OpenMP pragmas (`ofast_omp_improved`)
+- **12.79× speedup** at 56 threads, demonstrating that compiling with `-fopenmp` alone is insufficient without explicit pragmas in the code
+- This demonstrates that code-level parallelization optimizations are essential, and no amount of compiler optimization can compensate for insufficient parallelization
 
 ### 5. Communication Overhead Successfully Hidden
 

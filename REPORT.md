@@ -42,8 +42,9 @@
   - [4.2 OpenMP Scaling Analysis (Intra-node)](#42-openmp-scaling-analysis-intra-node)
   - [4.3 Strong Scalability Study (Multi-node)](#43-strong-scalability-study-multi-node)
   - [4.4 Weak Scalability Study (Multi-node)](#44-weak-scalability-study-multi-node)
-  - [4.5 Compiler Optimization Impact Analysis](#45-compiler-optimization-impact-analysis)
-  - [4.7 Performance Profiling and Bottlenecks](#47-performance-profiling-and-bottlenecks)
+  - [4.5 OpenMP Code Optimization Impact Analysis](#45-openmp-code-optimization-impact-analysis)
+    - [4.5.1 OpenMP Code Optimization Impact](#451-openmp-code-optimization-impact)
+  - [4.6 Performance Profiling and Bottlenecks](#46-performance-profiling-and-bottlenecks)
 - [5. DISCUSSION \& CONCLUSION](#5-discussion--conclusion)
   - [5.1 Main Achievements](#51-main-achievements)
   - [5.2 Limitations](#52-limitations)
@@ -83,13 +84,13 @@ where $u(x,y,t)$ represents the temperature field and $\alpha$ is the thermal di
 
 ![Heat Diffusion Evolution](figures/evolution_grid.png)
 
-**Figure 8: Temporal Evolution of Heat Diffusion on a 2D Grid**
+**Figure 1: Temporal Evolution of Heat Diffusion on a 2D Grid**
 
 The figure above illustrates the temporal evolution of the temperature field, showing how heat diffuses from initial sources across the computational domain. Each subplot represents a snapshot at different time steps, demonstrating the characteristic diffusion pattern of the 5-point stencil algorithm.
 
 ![Energy Evolution](figures/energy_evolution.png)
 
-**Figure 9: Total Energy Evolution Over Time**
+**Figure 2: Total Energy Evolution Over Time**
 
 The energy evolution plot confirms energy conservation: the total energy in the system remains constant (matching the injected energy) throughout the simulation, validating the correctness of the numerical implementation.
 
@@ -211,7 +212,7 @@ The halo exchange follows a precise sequence optimized for performance:
 The execution flow is visualized in the following flowchart:
 
 ```mermaid
-flowchart TD
+flowchart LR
     Start([Start Iteration]) --> Pack[Pack Halo Buffers<br/><i>OpenMP Parallel</i>]
     Pack --> Isend[Start Non-blocking MPI<br/><i>Isend / Irecv</i>]
     
@@ -230,23 +231,41 @@ flowchart TD
     style Transfer fill:#ffe8d6,stroke:#ff9f1c,stroke-width:2px,stroke-dasharray: 5 5
 ```
 
-This strategy ensures that the CPU remains busy performing useful work while the network hardware handles data transfer. The timeline comparison below illustrates the gain:
+This strategy ensures that the CPU remains busy performing useful work while the network hardware handles data transfer. The detailed timeline below shows the execution flow:
+
+**Communication Flow:**
+- **Send**: Each process sends its local border values (East/West columns, North/South rows) to neighbors, who need them as halo data for computing their borders.
+- **Receive**: Each process receives halo data from neighbors, which will be used to compute its own border points.
+
+**Computation Flow:**
+- **Interior points**: Computed immediately (don't require halo data) while communication is in progress.
+- **Border points**: Computed after receiving and unpacking halo data from neighbors.
+
+**End of Iteration:**
+- After computing borders, the plane indices are swapped (`current = !current`) to prepare for the next iteration, where the newly computed plane becomes the input for the next time step.
 
 ```mermaid
+%%{init: { 'gantt': { 'axisFormat': ' ', 'tickInterval': '1000s' }}}%%
 gantt
-    title Impact of Overlap Strategy
-    dateFormat s
-    axisFormat %S
+    title Parallel Stencil: Functional Logic Flow
+    dateFormat  ss
     
-    section Standard Approach
-    Communicate (Wait) :crit, a1, 0, 2
-    Compute (All)      :active, a2, after a1, 8
+    section Initialization
+    1. Heat Injection              :p1, 00, 15s
+    2. Pack Local Halo             :p2, after p1, 15s
     
-    section Overlapped Strategy
-    Start Comm         :crit, b1, 0, 0.5
-    Compute Interior   :active, b2, after b1, 6.5
-    Wait Comm          :crit, b3, after b2, 0.5
-    Compute Borders    :active, b4, after b3, 1.5
+    section Communication
+    3. MPI Start                   :crit, c1, after p2, 5s
+    4. Network Transfer            :active, net, after c1, 25s
+    
+    section Computation
+    5. Comp Interior               :comp, after c1, 12s
+    6. Neighbor Sync               :crit, w1, after comp, 15s
+    
+    section Finalization
+    7. Unpack Neighbor Halo        :active, p7, after w1, 15s
+    8. Comp Borders                :p8, after p7, 10s
+    9. Swap & Stats                :p9, after p8, 15s
 ```
 
 ## 3.3 Optimization Techniques
@@ -321,7 +340,7 @@ The performance analysis was conducted using a comprehensive suite of 399 experi
     -   **8×14 (standard)**: 8 MPI tasks per node, 14 OpenMP threads per task — balanced hybrid approach
     -   **2×56 (few_tasks)**: 2 MPI tasks per node, 56 OpenMP threads per task — "fat-node" approach
     -   **16×7 (many_tasks)**: 16 MPI tasks per node, 7 OpenMP threads per task — "many-MPI" approach
--   **Build Variant**: `ofast_omp_improved` was used as the primary build variant (compiler flags: `-Ofast -flto -fopenmp -march=native`). This variant includes full optimization with Link Time Optimization (LTO) and architecture-specific optimizations for the Sapphire Rapids processors. Comparative tests were also performed with reduced optimization levels (`o0`, `o1`) and without architecture-specific flags (`noarch`) to evaluate the impact of compiler optimizations.
+-   **Build Variant**: `ofast_omp_improved` was used as the primary build variant (compiler flags: `-Ofast -flto -fopenmp -march=native`). This variant includes full optimization with Link Time Optimization (LTO) and architecture-specific optimizations for the Sapphire Rapids processors. For OpenMP scaling analysis, comparative tests were performed between `ofast` and `ofast_omp_improved` to evaluate the impact of OpenMP pragma optimizations.
 -   **MPI/OpenMP Stack**: OpenMPI 4.1.6 with GCC 12.2.0, loaded via module `openmpi/4.1.6--gcc--12.2.0`.
 -   **OpenMP Configuration**: 
     -   `OMP_PLACES=cores`: Threads pinned to physical cores (not hyperthreads)
@@ -330,15 +349,15 @@ The performance analysis was conducted using a comprehensive suite of 399 experi
 -   **SLURM Configuration**: Exclusive node allocation (`--exclusive`) on the `dcgp_usr_prod` partition, ensuring no resource sharing and consistent performance measurements.
 
 ## 4.2 OpenMP Scaling Analysis (Intra-node)
-We first analyzed the scaling behavior within a single node to determine the optimal thread count per MPI task. Tests were conducted with 1, 2, and 8 energy sources; the results in Figures 5-6 are aggregated across all energy source counts, as the number of sources has minimal impact on performance.
+We first analyzed the scaling behavior within a single node to determine the optimal thread count per MPI task. Tests were conducted with 1, 2, and 8 energy sources; the results in Figures 3-4 are aggregated across all energy source counts, as the number of sources has minimal impact on performance.
 
 ![OpenMP Scaling Speedup](figures/omp_speedup.png)
 
-**Figure 1: OpenMP Scaling Speedup (1 node, 1-112 threads)**
+**Figure 3: OpenMP Scaling Speedup (1 node, 1-112 threads)**
 
 ![OpenMP Scaling Efficiency](figures/omp_efficiency.png)
 
-**Figure 2: OpenMP Scaling Efficiency**
+**Figure 4: OpenMP Scaling Efficiency**
 
 -   **Scalability**: The code showed good scaling up to 16 threads, after which memory bandwidth saturation led to diminishing returns (the "memory wall").
 -   **Efficiency**: Using 18 OpenMP pragmas, we improved the parallel efficiency significantly. At 8 threads, the speedup increased from 1.04× (naive) to 1.87× (optimized).
@@ -377,7 +396,7 @@ Strong scaling tests were performed by fixing the problem size (16384×16384) an
 
 ![Strong Scaling Speedup and Efficiency](figures/strong_speedup_efficiency.png)
 
-**Figure 3: Strong Scaling Speedup and Parallel Efficiency Comparison**
+**Figure 5: Strong Scaling Speedup and Parallel Efficiency Comparison**
 
 **Technical Analysis of Speedup and Efficiency Results:**
 
@@ -410,11 +429,9 @@ The visualization clearly demonstrates that **the 16×7 configuration provides t
 -   **16×7 Configuration**: Achieved the best absolute performance (0.72s at 16 nodes) with 17.46× speedup and 109.1% efficiency. The many-MPI approach maximizes memory bandwidth utilization by distributing work across more MPI ranks, though it increases communication overhead.
 -   **Overall Comparison**: The 16×7 configuration achieves the fastest time-to-solution due to superior memory bandwidth saturation, while the 8×14 configuration offers the best balance between performance and communication efficiency. The 2×56 configuration demonstrates that maximizing threads per MPI rank is not optimal for this memory-bound kernel.
 
-**Figure 4: Configuration Comparison (Strong Scaling)**
-
 ![Strong Scaling Execution Time](figures/strong_execution_time.png)
 
-**Figure 5: Strong Scaling Execution Time Breakdown**
+**Figure 6: Strong Scaling Execution Time Breakdown**
 
 **Technical Analysis of Execution Time:**
 
@@ -432,26 +449,52 @@ The execution time breakdown plot reveals several critical insights into our str
 
 6. **Key Insight**: The small gap between "Total Time" and "Communication Time" lines visually demonstrates that **computation dominates the execution time**, and our overlap strategy successfully hides communication overhead. The execution time reduction follows near-linear scaling, confirming excellent strong scaling performance across all configurations.
 
+![Strong Scaling Execution Time - 16×7 Configuration](figures/strong_execution_time_16x7.png)
+
+**Figure 7: Strong Scaling Execution Time Breakdown - 16×7 Configuration**
+
+**Technical Analysis of 16×7 Configuration Execution Time:**
+
+The execution time breakdown for the 16×7 configuration provides detailed insights into the communication overhead management:
+
+1. **Communication Overhead Remains Low**: Despite scaling from 16 to 256 MPI tasks (1 to 16 nodes), the communication time represents a small and well-controlled fraction of total execution time:
+   - **1 node**: 0.58s communication (4.6% of 12.64s total)
+   - **2 nodes**: 0.31s communication (4.9% of 6.36s total)
+   - **4 nodes**: 0.17s communication (5.6% of 3.12s total)
+   - **8 nodes**: 0.12s communication (7.7% of 1.54s total)
+   - **16 nodes**: 0.08s communication (10.9% of 0.72s total)
+
+2. **Communication Overhead Scaling**: The communication overhead percentage increases slightly from 4.6% (1 node) to 10.9% (16 nodes), which is expected as the computational work per node decreases while the number of MPI tasks increases. However, even at 16 nodes with 256 MPI tasks, communication remains below 11% of total time, demonstrating the effectiveness of our overlap strategy.
+
+3. **Absolute Communication Time Decreases**: Interestingly, the absolute communication time actually decreases as more nodes are added (from 0.58s at 1 node to 0.08s at 16 nodes). This occurs because:
+   - The per-node sub-domain size decreases, reducing the amount of halo data exchanged per MPI task
+   - The communication pattern benefits from better network utilization with more distributed tasks
+   - The overlap strategy successfully hides most communication latency behind computation
+
+4. **Computation Dominance**: The large gap between total time and communication time lines visually confirms that **computation dominates execution time** (89-95% of total time), validating that our implementation is primarily limited by memory bandwidth rather than network communication.
+
+5. **Scalability Validation**: The consistent low communication overhead across all node counts confirms that the 16×7 configuration maintains excellent scalability, with communication never becoming a bottleneck even at the largest scale tested (16 nodes, 256 MPI tasks).
+
 ## 4.4 Weak Scalability Study (Multi-node)
 Weak scaling tests involved increasing the problem size proportionally to the number of nodes, keeping the workload per core constant. The 16×7 hybrid configuration was tested to evaluate weak scaling behavior. Tests were performed with 1 energy source. The grid size scales proportionally with the number of nodes to maintain constant work per core.
 
 **Table 3: Weak Scaling Performance (16×7 Configuration)**
 
-| Nodes | Grid Size | Total Points | Runtime Non-Periodic (s) | Efficiency Non-Periodic | Runtime Periodic (s) | Efficiency Periodic |
-| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **1** | 16384 × 16384 | 2.68 $\cdot 10^8$ | 12.66 | 100.0% | 12.68 | 100.0% |
-| **2** | 23170 × 23170 | 5.37 $\cdot 10^8$ | 12.94 | 97.9% | 13.46 | 94.2% |
-| **4** | 32768 × 32768 | 1.07 $\cdot 10^9$ | 12.82 | 98.8% | 12.99 | 97.6% |
-| **8** | 46340 × 46340 | 2.15 $\cdot 10^9$ | 13.08 | 96.8% | 13.19 | 96.1% |
-| **16** | 65536 × 65536 | 4.29 $\cdot 10^9$ | 12.68 | **99.9%** | 13.13 | **96.6%** |
+| Nodes | Grid Size | Total Points | Runtime Non-Periodic (s) | Computation Non-Periodic (s) | Communication Non-Periodic (s) | Efficiency Non-Periodic | Runtime Periodic (s) | Computation Periodic (s) | Communication Periodic (s) | Efficiency Periodic |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **1** | 16384 × 16384 | 2.68 $\cdot 10^8$ | 12.66 | 12.52 | 0.42 | 100.0% | 12.68 | 12.53 | 0.44 | 100.0% |
+| **2** | 23170 × 23170 | 5.37 $\cdot 10^8$ | 12.94 | 12.80 | 0.57 | 97.9% | 13.46 | 13.31 | 1.07 | 94.2% |
+| **4** | 32768 × 32768 | 1.07 $\cdot 10^9$ | 12.82 | 12.79 | 0.60 | 98.8% | 12.99 | 12.90 | 0.79 | 97.6% |
+| **8** | 46340 × 46340 | 2.15 $\cdot 10^9$ | 13.08 | 12.95 | 0.63 | 96.8% | 13.19 | 13.10 | 0.91 | 96.1% |
+| **16** | 65536 × 65536 | 4.29 $\cdot 10^9$ | 12.68 | 12.77 | 0.76 | **99.9%** | 13.13 | 13.12 | 1.14 | **96.6%** |
 
 ![Weak Scaling Efficiency](figures/weak_efficiency.png)
 
-**Figure 7: Weak Scaling Efficiency (16×7 Configuration)**
+**Figure 8: Weak Scaling Efficiency (16×7 Configuration)**
 
 ![Weak Scaling Execution Time](figures/weak_execution_time.png)
 
-**Figure 8: Weak Scaling Execution Time Breakdown (16×7 Configuration)**
+**Figure 9: Weak Scaling Execution Time Breakdown (16×7 Configuration)**
 
 **Technical Analysis of Execution Time Breakdown:**
 
@@ -483,32 +526,52 @@ The execution time breakdown plot reveals several critical insights into weak sc
 -   **Communication Overhead**: The consistent runtime across scales indicates that communication overhead scales proportionally with computation, and our overlap strategy successfully hides most communication latency even at larger scales, regardless of boundary conditions.
 -   **Overall**: These results validate the **efficiency and robustness** of the hybrid parallel strategy, demonstrating that the implementation maintains excellent weak scalability up to 16 nodes (1792 cores) while scaling the problem size by a factor of 16×, with both periodic and non-periodic boundary conditions.
 
-## 4.5 Compiler Optimization Impact Analysis
-To evaluate the impact of compiler optimizations, we performed comparative tests with different optimization levels. All tests used the 8×14 configuration (1 and 4 nodes) with a single energy source.
+## 4.5 OpenMP Code Optimization Impact Analysis
 
-**Table 4: Compiler Optimization Level Comparison (8×14 Configuration)**
+To evaluate the impact of OpenMP pragma optimizations in the serial (OpenMP-only) implementation, we performed comparative tests between two code variants that use identical compiler flags but differ in their OpenMP parallelization:
 
-| Build Variant | Compiler Flags | Runtime (1 node) | Speedup vs. o0 | Runtime (4 nodes) | Speedup vs. o0 |
-| :---: | :--- | :---: | :---: | :---: | :---: |
-| **o0** | `-O0 -fopenmp -march=native` | 65.41 s | 1.00× | 15.79 s | 1.00× |
-| **o1** | `-O1 -flto -fopenmp -march=native` | 22.93 s | 2.85× | 5.65 s | 2.80× |
-| **noarch** | `-Ofast -flto -fopenmp` | 22.02 s | 2.97× | 5.33 s | 2.96× |
-| **ofast** | `-Ofast -flto -fopenmp -march=native` | 22.86 s | 2.86× | 5.97 s | 2.65× |
-| **ofast_omp_improved** | `-Ofast -flto -fopenmp -march=native` | 23.26 s | 2.81× | 5.83 s | 2.71× |
+1. **`ofast`**: Uses the same compiler flags (`-Ofast -flto -fopenmp -march=native`) but with **insufficient OpenMP parallelization** in the code (missing or inactive pragmas)
+2. **`ofast_omp_improved`**: Uses identical compiler flags but with **strategic placement of 18 OpenMP pragmas** that enable effective parallelization
 
-![Build Variant Comparison](figures/build_variant_comparison.png)
+Both variants are compiled with the same optimization level, allowing us to isolate the impact of code-level OpenMP optimizations from compiler optimizations.
 
-**Figure 9: Compiler Optimization Impact Comparison**
+### 4.5.1 OpenMP Code Optimization Impact
+
+The OpenMP scaling tests were conducted on a single node with varying thread counts (1-112 threads) and a single energy source. These tests demonstrate the critical importance of explicit OpenMP pragmas in the code, even when compiled with `-fopenmp`.
+
+![OpenMP Build Variant Comparison](figures/omp_build_variant_comparison.png)
+
+**Figure 10: OpenMP Code Optimization Impact Comparison**
 
 **Key Observations:**
--   **Optimization Impact**: Enabling compiler optimizations (`-O1` or higher) provides approximately **2.8-3.0× speedup** compared to unoptimized code (`-O0`), demonstrating the critical importance of compiler optimizations for performance.
--   **Architecture-Specific Flags**: The `-march=native` flag provides minimal additional benefit (comparing `noarch` vs. `ofast`), suggesting that the generic `-Ofast` optimizations are already highly effective. The small performance difference (2.97× vs. 2.86×) indicates that the compiler's generic optimizations are well-tuned for modern x86-64 architectures.
--   **Link Time Optimization (LTO)**: The `-flto` flag enables cross-module optimizations that can improve performance, though its impact is already captured in the `-O1` and `-Ofast` results.
--   **Consistency**: The speedup ratios remain consistent across different node counts (1 vs. 4 nodes), indicating that compiler optimizations scale well with parallel execution.
 
-These results confirm that aggressive compiler optimizations are essential for achieving high performance on memory-bound kernels like the 5-point stencil, with the `ofast_omp_improved` variant providing the best balance of performance and code quality.
+1. **Dramatic Impact of OpenMP Pragmas**: The `ofast_omp_improved` variant demonstrates **extraordinary speedup** compared to `ofast`:
+   - At 56 threads: **12.79× speedup** (runtime: 12.95s vs. 165.66s)
+   - At 112 threads: **20.28× speedup** (runtime: 7.91s vs. 160.48s)
+   This massive improvement is **not** due to compiler flags (which are identical), but rather to the strategic placement of 18 OpenMP pragmas that enable effective parallelization of the computation loops.
 
-## 4.7 Performance Profiling and Bottlenecks
+2. **Critical Importance of Explicit Parallelization**: The `ofast` variant shows **constant runtime** (~165s) regardless of the number of threads (1-112), indicating that the code runs sequentially on a single thread despite being compiled with `-fopenmp` and having `OMP_NUM_THREADS` set. This demonstrates that **compiling with `-fopenmp` is not sufficient**—explicit `#pragma omp parallel for` directives are required in the code to enable parallelization.
+
+3. **Memory-Bound Behavior**: The `ofast` variant's constant runtime confirms that without proper OpenMP parallelization, the code is severely memory-bound, with the single-threaded memory access pattern preventing effective utilization of multiple cores. The `ofast_omp_improved` variant successfully parallelizes the computation, achieving significant speedup up to 56 threads, after which memory bandwidth saturation leads to diminishing returns.
+
+4. **Scaling Behavior**: The `ofast_omp_improved` variant shows excellent scaling up to 16 threads, with speedup increasing from 1.03× (1 thread) to 3.73× (16 threads). Beyond 16 threads, efficiency decreases due to memory bandwidth limitations, but the absolute performance continues to improve up to 112 threads (20.28× speedup vs. `ofast`).
+
+**Table 4: OpenMP Code Optimization Impact (Single Node, 16384×16384 Grid)**
+
+| Threads | ofast Runtime (s) | ofast_omp_improved Runtime (s) | Speedup | Efficiency |
+| :---: | :---: | :---: | :---: | :---: |
+| **1** | 165.24 | 160.60 | 1.03× | 103% |
+| **2** | 163.56 | 98.14 | 1.67× | 84% |
+| **4** | 166.27 | 66.37 | 2.51× | 63% |
+| **8** | 160.81 | 54.08 | 2.97× | 37% |
+| **16** | 158.46 | 42.45 | 3.73× | 23% |
+| **32** | 162.85 | 22.41 | 7.27× | 23% |
+| **56** | 165.66 | 12.95 | 12.79× | 23% |
+| **112** | 160.48 | 7.91 | 20.28× | 18% |
+
+**Key Insight**: This analysis demonstrates that **code-level parallelization optimizations (OpenMP pragmas) are essential** for achieving high performance. No amount of compiler optimization can compensate for insufficient parallelization. The 20× speedup achieved by `ofast_omp_improved` at 112 threads validates the effectiveness of strategic OpenMP pragma placement, even in memory-bound applications.
+
+## 4.6 Performance Profiling and Bottlenecks
 Detailed instrumentation revealed the breakdown of execution time:
 -   **Computation**: ~90% of total time.
 -   **Communication**: <10% of total time.
